@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Synapse Neural Recall Interface</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #040711;
+      --panel-bg: rgba(8, 14, 28, 0.78);
+      --border-cyan: #00f0ff;
+      --glow-cyan: rgba(0, 240, 255, 0.28);
+      --neon-lime: #00ff88;
+      --glow-lime: rgba(0, 255, 136, 0.25);
+      --neon-magenta: #ff0055;
+      --glow-magenta: rgba(255, 0, 85, 0.3);
+      --neon-amber: #ffaa00;
+      --glow-amber: rgba(255, 170, 0, 0.3);
+      --text-main: #e0f2fe;
+      --text-dim: #64748b;
+      --font-display: 'Chakra Petch', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Matrix Grid & Scanline Effect */
+    .grid-matrix {
+      position: fixed;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px);
+      background-size: 32px 32px;
+      z-index: -2;
+      pointer-events: none;
+    }
+    body::before {
+      content: " ";
+      position: fixed;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 255, 0, 0.03));
+      z-index: 999;
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 890px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 1;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-cyan);
+      box-shadow: 0 0 16px var(--glow-cyan), inset 0 0 16px rgba(0, 240, 255, 0.05);
+      border-radius: 8px;
+      padding: 16px 20px;
+      position: relative;
+    }
+    .header-info h1 {
+      font-family: var(--font-display);
+      font-size: 1.65rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #fff;
+      text-shadow: 0 0 10px var(--glow-cyan);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-info p {
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      margin-top: 2px;
+    }
+    .user-profile-hud {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .avatar-wrapper {
+      position: relative;
+      width: 52px;
+      height: 52px;
+    }
+    .avatar-img {
+      width: 100%;
+      height: 100%;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid var(--border-cyan);
+      box-shadow: 0 0 12px var(--glow-cyan);
+    }
+    .status-ring {
+      position: absolute;
+      bottom: -2px;
+      right: -2px;
+      width: 10px;
+      height: 10px;
+      background: var(--neon-lime);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--neon-lime);
+      border: 2px solid var(--bg);
+    }
+
+    /* Telemetry HUD Grid */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .hud-cell {
+      background: var(--panel-bg);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      border-radius: 6px;
+      padding: 10px 14px;
+      text-align: center;
+      position: relative;
+    }
+    .hud-cell::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px; height: 100%;
+      background: var(--border-cyan);
+    }
+    .hud-val {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 0 10px var(--glow-cyan);
+    }
+    .hud-lbl {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 2px;
+    }
+
+    /* Progress Track */
+    .stream-bar-wrapper {
+      background: var(--panel-bg);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      border-radius: 6px;
+      padding: 8px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .stream-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+    .stream-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 240, 255, 0.15);
+    }
+    .stream-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--border-cyan), var(--neon-lime));
+      box-shadow: 0 0 10px var(--glow-cyan);
+      transition: width 0.3s ease;
+    }
+
+    /* Controls Panel */
+    .controls-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .terminal-select {
+      background: var(--panel-bg);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      color: var(--border-cyan);
+      font-family: var(--font-mono);
+      padding: 10px 14px;
+      border-radius: 6px;
+      outline: none;
+      font-size: 0.82rem;
+      cursor: pointer;
+      width: 100%;
+    }
+    .terminal-select:focus {
+      border-color: var(--border-cyan);
+      box-shadow: 0 0 12px var(--glow-cyan);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+    }
+    .tab-btn {
+      flex: 1;
+      background: var(--panel-bg);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      color: var(--text-dim);
+      padding: 10px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.2s ease;
+    }
+    .tab-btn:hover {
+      border-color: var(--border-cyan);
+      color: #fff;
+    }
+    .tab-btn.active {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--border-cyan);
+      color: #fff;
+      box-shadow: 0 0 12px var(--glow-cyan);
+    }
+    .badge {
+      background: var(--neon-magenta);
+      color: #fff;
+      font-size: 0.65rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-left: 4px;
+      box-shadow: 0 0 8px var(--glow-magenta);
+    }
+
+    /* Core Card */
+    .view-card {
+      background: var(--panel-bg);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 8px;
+      padding: 24px;
+      min-height: 450px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      box-shadow: 0 0 24px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(0, 240, 255, 0.03);
+    }
+    .meta-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      font-size: 0.78rem;
+    }
+    .terminal-tag {
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid var(--border-cyan);
+      color: var(--border-cyan);
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+
+    .question-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      line-height: 1.5;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 20px;
+    }
+
+    /* Multiple Choice */
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .opt-btn {
+      text-align: left;
+      background: rgba(4, 7, 17, 0.75);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      color: var(--text-main);
+      padding: 14px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      transition: all 0.2s;
+    }
+    .opt-btn:hover:not(:disabled) {
+      border-color: var(--border-cyan);
+      background: rgba(0, 240, 255, 0.05);
+      transform: translateX(4px);
+    }
+    .opt-btn.correct {
+      background: rgba(0, 255, 136, 0.15) !important;
+      border-color: var(--neon-lime) !important;
+      color: var(--neon-lime) !important;
+      box-shadow: 0 0 14px var(--glow-lime) !important;
+    }
+    .opt-btn.wrong {
+      background: rgba(255, 0, 85, 0.15) !important;
+      border-color: var(--neon-magenta) !important;
+      color: #fda4af !important;
+      box-shadow: 0 0 14px var(--glow-magenta) !important;
+    }
+
+    /* Identification Input */
+    .id-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .terminal-input {
+      width: 100%;
+      background: rgba(4, 7, 17, 0.9);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      color: #fff;
+      padding: 14px 16px;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: all 0.2s;
+    }
+    .terminal-input:focus {
+      border-color: var(--border-cyan);
+      box-shadow: 0 0 14px var(--glow-cyan);
+    }
+    .terminal-input.correct {
+      border-color: var(--neon-lime) !important;
+      background: rgba(0, 255, 136, 0.1) !important;
+      box-shadow: 0 0 14px var(--glow-lime) !important;
+    }
+    .terminal-input.wrong {
+      border-color: var(--neon-magenta) !important;
+      background: rgba(255, 0, 85, 0.1) !important;
+      box-shadow: 0 0 14px var(--glow-magenta) !important;
+    }
+
+    /* Flashcards */
+    .flip-container {
+      perspective: 1000px;
+      width: 100%;
+      height: 250px;
+      cursor: pointer;
+      margin-bottom: 18px;
+    }
+    .flip-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.5s;
+      transform-style: preserve-3d;
+    }
+    .flip-inner.flipped { transform: rotateY(180deg); }
+    .flip-front, .flip-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      border-radius: 6px;
+      background: rgba(4, 7, 17, 0.9);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+    }
+    .flip-back {
+      transform: rotateY(180deg);
+      border-color: var(--border-cyan);
+    }
+    .flip-hint {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      margin-top: 14px;
+      letter-spacing: 1px;
+    }
+
+    /* Feedback Banner with Rationale Box */
+    .feedback {
+      padding: 14px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      display: none;
+    }
+    .feedback.show { display: block; }
+    .feedback.correct {
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid var(--neon-lime);
+      color: var(--neon-lime);
+    }
+    .feedback.wrong {
+      background: rgba(255, 0, 85, 0.1);
+      border: 1px solid var(--neon-magenta);
+      color: #fda4af;
+    }
+    .rationale-box {
+      margin-top: 10px;
+      padding: 12px 14px;
+      background: rgba(0, 0, 0, 0.65);
+      border-radius: 4px;
+      border-left: 3px solid var(--neon-amber);
+      font-size: 0.84rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+    .rationale-box strong { color: var(--neon-amber); display: block; margin-bottom: 4px; }
+
+    /* Action Controls & REDO Section */
+    .actions-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      border-top: 1px solid rgba(0, 240, 255, 0.15);
+      padding-top: 16px;
+    }
+    .action-group-left, .action-group-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      padding: 11px 18px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: 1px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary { 
+      background: var(--border-cyan); 
+      color: #040711; 
+      box-shadow: 0 0 14px var(--glow-cyan);
+    }
+    .btn-primary:hover:not(:disabled) { 
+      background: #38bdf8;
+      box-shadow: 0 0 20px var(--glow-cyan);
+    }
+    .btn-secondary { 
+      background: rgba(255, 255, 255, 0.05); 
+      color: var(--text-main);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+    }
+    .btn-secondary:hover:not(:disabled) { 
+      background: rgba(0, 240, 255, 0.1); 
+      border-color: var(--border-cyan);
+    }
+    /* Dedicated Redo Button Design */
+    .btn-redo {
+      background: rgba(255, 170, 0, 0.1);
+      border: 1px solid var(--neon-amber);
+      color: var(--neon-amber);
+      box-shadow: 0 0 10px rgba(255, 170, 0, 0.2);
+    }
+    .btn-redo:hover:not(:disabled) {
+      background: rgba(255, 170, 0, 0.2);
+      box-shadow: 0 0 16px var(--glow-amber);
+      transform: translateY(-1px);
+    }
+    .btn:disabled { 
+      opacity: 0.3; 
+      cursor: not-allowed; 
+    }
+
+    /* Vault Cards */
+    .vault-card {
+      background: rgba(4, 7, 17, 0.85);
+      border: 1px solid rgba(255, 0, 85, 0.3);
+      border-left: 4px solid var(--neon-magenta);
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .vault-card h4 { font-size: 0.98rem; color: #fff; font-family: var(--font-display); }
+    .vault-card p { font-size: 0.84rem; color: var(--text-dim); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="grid-matrix"></div>
+
+<div class="container">
+  <!-- System Header with Profile Integration -->
+  <header>
+    <div class="header-info">
+      <h1><span style="color: var(--border-cyan);">SYNAPSE</span> // RECALL TERMINAL</h1>
+      <p>System Status: Active | Protocols: SDG 3, 4, 5, 6, 7 Architecture</p>
+    </div>
+    <div class="user-profile-hud">
+      <div class="avatar-wrapper">
+        <img src="vi9maq.jpg" alt="Agent Icon" class="avatar-img" onerror="this.src='https://api.dicebear.com/7.x/bottts/svg?seed=RecallNode'" />
+        <div class="status-ring"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Telemetry Dashboard -->
+  <div class="telemetry-grid">
+    <div class="hud-cell">
+      <div class="hud-val" id="scoreVal">0</div>
+      <div class="hud-lbl">Sync Score</div>
+    </div>
+    <div class="hud-cell">
+      <div class="hud-val" id="accuracyVal">0%</div>
+      <div class="hud-lbl">Accuracy Index</div>
+    </div>
+    <div class="hud-cell">
+      <div class="hud-val" id="streakVal">0 🔥</div>
+      <div class="hud-lbl">Neural Streak</div>
+    </div>
+    <div class="hud-cell">
+      <div class="hud-val" id="levelVal">Tier 1</div>
+      <div class="hud-lbl">Authorization</div>
+    </div>
+  </div>
+
+  <!-- Telemetry Progress Bar -->
+  <div class="stream-bar-wrapper">
+    <div class="stream-info">
+      <span id="deckProgressText">INDEX: 01 / 30</span>
+      <span id="xpText">0 / 100 CALIBER</span>
+    </div>
+    <div class="stream-track">
+      <div class="stream-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <!-- Controls Panel -->
+  <div class="controls-panel">
+    <select id="topicFilter" class="terminal-select" onchange="applyFilters()">
+      <option value="all">EXECUTE: ALL DATA BANKS (90 CONCEPTS)</option>
+      <option value="t4">MODULE 04: HEALTH, SANITATION & WELL-BEING (30 CONCEPTS)</option>
+      <option value="t5">MODULE 05: EDUCATION, GENDER & CAPABILITY (30 CONCEPTS)</option>
+      <option value="t6">MODULE 06: ENERGY, INFRASTRUCTURE & SYSTEMS (30 CONCEPTS)</option>
+    </select>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchMode('mcq')">Multiple Choice</button>
+      <button class="tab-btn" onclick="switchMode('identification')">Identification</button>
+      <button class="tab-btn" onclick="switchMode('flashcard')">Flashcards</button>
+      <button class="tab-btn" onclick="switchMode('vault')">
+        Review Topics <span id="vaultBadge" class="badge">0</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Active Recall Display -->
+  <div id="deckView" class="view-card">
+    <div>
+      <div class="meta-bar">
+        <span class="terminal-tag" id="tagCategory">MODULE 04</span>
+        <span id="cardCountLabel" style="color: var(--border-cyan); font-weight:700;">01 / 30</span>
+      </div>
+
+      <div id="questionContainer">
+        <!-- Injected Dynamically -->
+      </div>
+
+      <div id="feedbackBox" class="feedback"></div>
+    </div>
+
+    <!-- Actions Footer with Dedicated REDO Section -->
+    <div class="actions-footer" id="actionsFooter">
+      <!-- Buttons Injected Dynamically -->
+    </div>
+  </div>
+
+  <!-- Diagnostic Mistake Vault -->
+  <div id="vaultView" class="view-card hidden">
+    <div>
+      <div class="meta-bar">
+        <span style="font-family: var(--font-display); color: #fff; letter-spacing: 1px;">DIAGNOSTIC ERROR LOG & REVIEWS</span>
+        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.72rem;" onclick="clearVault()">Purge Log</button>
+      </div>
+      <div id="vaultList" style="max-height: 460px; overflow-y: auto; padding-right: 6px;">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+    <div class="actions-footer">
+      <button class="btn btn-primary" onclick="drillVaultItems()">Drill Logged Errors</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Complete Dataset from Topics 4, 5, and 6 with Explicit "Why It Is True" Proofs
+  const allCurriculum = [
+    // --- TOPIC 4: Health, Well-being, Water, Sanitation (1 to 30) ---
+    {
+      id: "t4-1", topic: "t4", topicName: "Topic 4: Health Across Life Course",
+      title: "Life-Course Health",
+      question: "Which SDG seeks to ensure healthy lives and promote well-being for all at all ages across the entire life course?",
+      answer: "SDG 3",
+      aliases: ["sdg 3", "sdg3", "goal 3"],
+      options: ["SDG 1", "SDG 3", "SDG 5", "SDG 11"],
+      explanation: "SDG 3 recognizes health as a continuing human-development concern extending from pregnancy through old age.",
+      whyTrue: "The 2030 Agenda explicitly designates Goal 3 as 'Ensure healthy lives and promote well-being for all at all ages,' distinguishing it from goals that focus strictly on specific demographics like children or workers."
+    },
+    {
+      id: "t4-2", topic: "t4", topicName: "Topic 4: Maternal Health",
+      title: "Maternal Mortality Target",
+      question: "What is the global target ratio for maternal mortality per 100,000 live births by 2030 under Target 3.1?",
+      answer: "Fewer than 70",
+      aliases: ["70", "fewer than 70", "less than 70", "<70"],
+      options: ["Fewer than 50", "Fewer than 70", "Fewer than 100", "Fewer than 140"],
+      explanation: "Target 3.1 aims to reduce maternal mortality to less than 70 per 100,000 live births, tracked by skilled childbirth attendance.",
+      whyTrue: "The official UN 2030 indicator 3.1.1 benchmark specifies reducing the maternal mortality ratio to fewer than 70 deaths per 100,000 live births globally, verified through skilled health personnel attendance."
+    },
+    {
+      id: "t4-3", topic: "t4", topicName: "Topic 4: Child Survival",
+      title: "Neonatal & Under-5 Mortality",
+      question: "Which target establishes mortality objectives of 12 per 1,000 for neonatal and 25 per 1,000 for under-5 children by 2030?",
+      answer: "Target 3.2",
+      aliases: ["target 3.2", "3.2"],
+      options: ["Target 3.1", "Target 3.2", "Target 3.8", "Target 6.1"],
+      explanation: "Target 3.2 aims to end preventable newborn and under-5 child deaths globally.",
+      whyTrue: "Target 3.2 uniquely defines child survival by setting exact statistical thresholds: neonatal mortality at or below 12 per 1,000 live births and under-5 mortality at or below 25 per 1,000 live births."
+    },
+    {
+      id: "t4-4", topic: "t4", topicName: "Topic 4: Communicable Diseases",
+      title: "Ending Major Epidemics",
+      question: "Which target aims to end epidemics of AIDS, tuberculosis, malaria, and neglected tropical diseases (NTDs)?",
+      answer: "Target 3.3",
+      aliases: ["target 3.3", "3.3"],
+      options: ["Target 3.3", "Target 3.5", "Target 3.7", "Target 3.b"],
+      explanation: "Target 3.3 addresses major communicable epidemics alongside hepatitis and water-borne illnesses.",
+      whyTrue: "Target 3.3 directly combines infectious disease eradication strategies, monitoring annual incidence rates for HIV, TB, malaria, hepatitis B, and NTDs."
+    },
+    {
+      id: "t4-5", topic: "t4", topicName: "Topic 4: Non-Communicable Diseases",
+      title: "NCD Mortality Reduction",
+      question: "By what proportion does Target 3.4 seek to reduce premature mortality from major non-communicable diseases by 2030?",
+      answer: "One-third",
+      aliases: ["one-third", "1/3", "one third", "33%"],
+      options: ["One-half", "One-third", "One-fourth", "Two-thirds"],
+      explanation: "Target 3.4 addresses cardiovascular diseases, cancer, diabetes, and chronic respiratory diseases through prevention and treatment.",
+      whyTrue: "The treaty language under Target 3.4 specifies achieving a 'one-third reduction' in premature mortality from the four major NCD groups (cardiovascular, cancer, diabetes, chronic respiratory diseases)."
+    },
+    {
+      id: "t4-6", topic: "t4", topicName: "Topic 4: Mental Health",
+      title: "Mental Health Indicator",
+      question: "What specific mortality rate serves as an explicit indicator for mental health monitoring under Target 3.4?",
+      answer: "Suicide mortality rate",
+      aliases: ["suicide mortality rate", "suicide", "suicide rate"],
+      options: ["Substance overdose rate", "Depression prevalence", "Suicide mortality rate", "Anxiety admission rate"],
+      explanation: "Indicator 3.4.2 specifically tracks the suicide mortality rate to monitor progress in mental health.",
+      whyTrue: "Because clinical psychological distress is under-reported across many countries, the UN adopted the suicide mortality rate (Indicator 3.4.2) as the globally comparable, hard statistical metric for mental health."
+    },
+    {
+      id: "t4-7", topic: "t4", topicName: "Topic 4: Substance Abuse",
+      title: "Substance-Abuse Interventions",
+      question: "Target 3.5 focuses on strengthening the prevention and treatment of substance abuse, including narcotic drug abuse and harmful use of what?",
+      answer: "Alcohol",
+      aliases: ["alcohol", "alcohol use", "harmful alcohol use"],
+      options: ["Tobacco", "Alcohol", "Prescription opioids", "Sedatives"],
+      explanation: "Target 3.5 monitors both treatment coverage for substance use disorders and annual per-capita alcohol consumption.",
+      whyTrue: "Target 3.5 divides substance abuse into two tracked indicators: coverage of treatment interventions (3.5.1) and per capita alcohol consumption in pure liters among people aged 15 and older (3.5.2)."
+    },
+    {
+      id: "t4-8", topic: "t4", topicName: "Topic 4: Road Safety",
+      title: "Road Traffic Injuries",
+      question: "Which target directly connects transportation infrastructure and policy with human health by targeting casualties from road crashes?",
+      answer: "Target 3.6",
+      aliases: ["target 3.6", "3.6"],
+      options: ["Target 3.4", "Target 3.6", "Target 9.1", "Target 11.2"],
+      explanation: "Target 3.6 aims to halve the number of global deaths and injuries from road traffic accidents.",
+      whyTrue: "Road crashes are recognized as a public health epidemic; Target 3.6 mandates halving deaths and injuries from road traffic accidents worldwide."
+    },
+    {
+      id: "t4-9", topic: "t4", topicName: "Topic 4: Reproductive Health",
+      title: "Sexual and Reproductive Care",
+      question: "Target 3.7 focuses on universal access to sexual and reproductive health-care services, prominently including which service?",
+      answer: "Family planning",
+      aliases: ["family planning", "contraception"],
+      options: ["Family planning", "In-vitro fertilization", "Adoption services", "Midwifery licensing"],
+      explanation: "Target 3.7 monitors the proportion of women of reproductive age who have family planning needs satisfied with modern methods.",
+      whyTrue: "Indicator 3.7.1 tracks the proportion of women aged 15–49 who have their family planning needs met with modern contraception, making family planning the primary operational pillar of Target 3.7."
+    },
+    {
+      id: "t4-10", topic: "t4", topicName: "Topic 4: Universal Health Coverage",
+      title: "Universal Health Coverage (UHC)",
+      question: "Target 3.8 defines Universal Health Coverage as access to quality essential services alongside which vital economic protection?",
+      answer: "Financial risk protection",
+      aliases: ["financial risk protection", "financial protection"],
+      options: ["Direct cash handouts", "Financial risk protection", "Tax exemptions", "Guaranteed employment"],
+      explanation: "UHC ensures access to services, medicines, and vaccines without exposing households to catastrophic out-of-pocket health expenditures.",
+      whyTrue: "Medical efficacy without economic safeguards forces millions into extreme poverty. UHC explicitly pairs essential service coverage (3.8.1) with financial risk protection against high out-of-pocket health spending (3.8.2)."
+    },
+    {
+      id: "t4-11", topic: "t4", topicName: "Topic 4: Affordable Medicines",
+      title: "TRIPS & Doha Declaration",
+      question: "Which target affirms developing countries' rights to use TRIPS flexibilities to ensure affordable access to essential medicines and vaccines?",
+      answer: "Target 3.b",
+      aliases: ["target 3.b", "3.b"],
+      options: ["Target 3.8", "Target 3.a", "Target 3.b", "Target 3.c"],
+      explanation: "Target 3.b supports R&D and affirms the Doha Declaration on TRIPS flexibilities to protect public health and access for all.",
+      whyTrue: "Target 3.b explicitly cites the Doha Declaration on the TRIPS Agreement, legalizing the rights of developing nations to circumvent strict intellectual property barriers to manufacture and import affordable essential generics."
+    },
+    {
+      id: "t4-12", topic: "t4", topicName: "Topic 4: Health Financing",
+      title: "Health Workforce Financing",
+      question: "Which target calls for substantially increasing health financing and the recruitment, training, and retention of health workers?",
+      answer: "Target 3.c",
+      aliases: ["target 3.c", "3.c"],
+      options: ["Target 3.a", "Target 3.c", "Target 3.d", "Target 8.5"],
+      explanation: "Target 3.c specifically addresses health worker density and distribution in developing countries and SIDS.",
+      whyTrue: "Target 3.c is the dedicated means-of-implementation target for human resources in healthcare, directing investment into developing and retaining doctors and nurses in LDCs and SIDS."
+    },
+    {
+      id: "t4-13", topic: "t4", topicName: "Topic 4: Health Workforce",
+      title: "Health Worker Density",
+      question: "What metric is monitored under Indicator 3.c.1 to assess a country's health service delivery capacity?",
+      answer: "Health worker density and distribution",
+      aliases: ["health worker density", "health worker density and distribution"],
+      options: ["Hospital bed count", "Health worker density and distribution", "Physician salary index", "Medical school graduation rates"],
+      explanation: "Indicator 3.c.1 tracks health worker density and geographic distribution to ensure adequate workforce capacity.",
+      whyTrue: "Having medical equipment is useless without certified staff. Indicator 3.c.1 computes the number of physicians, nursing, and midwifery personnel per 10,000 population across both urban and rural distributions."
+    },
+    {
+      id: "t4-14", topic: "t4", topicName: "Topic 4: Emergency Preparedness",
+      title: "Early Warning & IHR Capacity",
+      question: "Which international regulatory capacity is tracked under Target 3.d for health emergency preparedness and risk management?",
+      answer: "International Health Regulations",
+      aliases: ["international health regulations", "ihr", "ihr capacity"],
+      options: ["Geneva Conventions", "International Health Regulations", "Kyoto Protocol", "Dakar Framework"],
+      explanation: "Target 3.d assesses International Health Regulations (IHR) capacity and early-warning management of global risks.",
+      whyTrue: "Under WHO governance, the International Health Regulations (IHR) represent the legally binding instrument that measures a state's core capacity to detect, report, and rapidly contain cross-border biological emergencies."
+    },
+    {
+      id: "t4-15", topic: "t4", topicName: "Topic 4: Environmental Health",
+      title: "Chemical and Pollution Hazards",
+      question: "Target 3.9 seeks to substantially reduce deaths and illnesses caused by hazardous chemicals and pollution of what three mediums?",
+      answer: "Air, water and soil",
+      aliases: ["air water and soil", "air, water, and soil", "air water soil"],
+      options: ["Air, water and soil", "Food, drugs and cosmetics", "Oceans, rivers and rain", "Workplaces, roads and homes"],
+      explanation: "Target 3.9 measures mortality attributed to household/ambient air pollution, unsafe WASH, and unintentional poisonings.",
+      whyTrue: "The treaty language of Target 3.9 specifically groups environmental contamination into the primary planetary mediums: ambient/household air (3.9.1), unsafe water and sanitation (3.9.2), and soil/chemical contamination (3.9.3)."
+    },
+    {
+      id: "t4-16", topic: "t4", topicName: "Topic 4: Water & Health",
+      title: "Foundations of Human Health",
+      question: "Which goal establishes the universal foundation for clean water and sanitation that directly protects human health?",
+      answer: "SDG 6",
+      aliases: ["sdg 6", "sdg6", "goal 6"],
+      options: ["SDG 2", "SDG 6", "SDG 12", "SDG 14"],
+      explanation: "SDG 6 focuses on safely managed clean water and sanitation, which underpin human health, dignity, and disease prevention.",
+      whyTrue: "Goal 6 is dedicated to 'Ensuring availability and sustainable management of water and sanitation for all', functioning as the bedrock environmental determinant preventing diarrhea and water-borne pathogens."
+    },
+    {
+      id: "t4-17", topic: "t4", topicName: "Topic 4: WASH Access Gap",
+      title: "The Global Sanitation Gap",
+      question: "How many people globally remain without safely managed drinking water and sanitation services, creating massive health risks?",
+      answer: "Billions",
+      aliases: ["billions", "billions of people"],
+      options: ["Millions", "Tens of millions", "Hundreds of millions", "Billions"],
+      explanation: "Billions worldwide still lack safely managed drinking water and sanitation infrastructure, disproportionately hurting the vulnerable.",
+      whyTrue: "UN Water and WHO global progress assessments confirm that over 2 billion people lack safely managed drinking water and over 3.6 billion lack safely managed sanitation."
+    },
+    {
+      id: "t4-18", topic: "t4", topicName: "Topic 4: Safe Drinking Water",
+      title: "Universal Drinking Water Access",
+      question: "Target 6.1 calls for universal, equitable, and affordable access to safe drinking water, meaning progress must reach whom?",
+      answer: "Disadvantaged populations",
+      aliases: ["disadvantaged populations", "vulnerable populations", "the disadvantaged", "marginalized groups"],
+      options: ["Urban centers only", "Industrial sectors", "Disadvantaged populations", "Middle-income earners"],
+      explanation: "The core principle of universality requires interventions to prioritize marginalized and disadvantaged populations.",
+      whyTrue: "The fundamental mandate of the 2030 Agenda is 'Leave No One Behind'; achieving universality means expanding infrastructure past affluent cities into historically marginalized and rural populations."
+    },
+    {
+      id: "t4-19", topic: "t4", topicName: "Topic 4: Sanitation & Hygiene",
+      title: "Ending Open Defecation",
+      question: "Target 6.2 aims to achieve adequate sanitation and hygiene for all, while paying special attention to women, girls, and ending what practice?",
+      answer: "Open defecation",
+      aliases: ["open defecation"],
+      options: ["Untreated recycling", "Open defecation", "Surface runoff", "Plastic discarding"],
+      explanation: "Target 6.2 prioritizes ending open defecation to safeguard health, hygiene, and female dignity.",
+      whyTrue: "Target 6.2 singles out ending open defecation because it contaminates community groundwater, transmits enteric infections, and endangers women and girls walking into isolated fields."
+    },
+    {
+      id: "t4-20", topic: "t4", topicName: "Topic 4: Human Right to Water",
+      title: "UN Recognition of Water as Human Right",
+      question: "In what year did the United Nations General Assembly explicitly recognize the human right to water and sanitation?",
+      answer: "2010",
+      aliases: ["2010"],
+      options: ["1992", "2000", "2010", "2015"],
+      explanation: "The UN formally codified access to clean drinking water and sanitation as an essential human right in 2010.",
+      whyTrue: "Through Resolution 64/292 passed on July 28, 2010, the UN General Assembly explicitly declared clean drinking water and sanitation to be an indispensable human right for the realization of all other human rights."
+    },
+    {
+      id: "t4-21", topic: "t4", topicName: "Topic 4: Water Quality",
+      title: "Wastewater and Safe Reuse",
+      question: "Target 6.3 seeks to improve water quality by halving the proportion of untreated what?",
+      answer: "Wastewater",
+      aliases: ["wastewater", "untreated wastewater"],
+      options: ["Agricultural runoff", "Wastewater", "Chemical sludge", "Desalination brine"],
+      explanation: "Target 6.3 calls for reducing hazardous dumping and substantially increasing safe wastewater treatment, recycling, and reuse.",
+      whyTrue: "Indicator 6.3.1 tracks the proportion of domestic and industrial wastewater safely treated before being discharged back into rivers and aquifers, halving raw contaminant exposure."
+    },
+    {
+      id: "t4-22", topic: "t4", topicName: "Topic 4: Water Scarcity",
+      title: "Water Scarcity and Stress",
+      question: "What three main factors drive increasing global water stress: overexploitation, climate change, and what else?",
+      answer: "Pollution",
+      aliases: ["pollution", "contamination"],
+      options: ["Pollution", "Urbanization", "Desalination", "Reforestation"],
+      explanation: "Overexploitation, pollution, and climate disruptions drive escalating freshwater depletion across the world.",
+      whyTrue: "Water stress occurs when usable freshwater volumes fall below demand; over-pumping, climate shifts in precipitation, and chemical/biological pollution render existing reserves toxic and unusable."
+    },
+    {
+      id: "t4-23", topic: "t4", topicName: "Topic 4: Water Efficiency",
+      title: "Cross-Sector Water-Use Efficiency",
+      question: "Which target calls for substantially increasing water-use efficiency across all sectors to address freshwater scarcity?",
+      answer: "Target 6.4",
+      aliases: ["target 6.4", "6.4"],
+      options: ["Target 6.1", "Target 6.2", "Target 6.4", "Target 6.5"],
+      explanation: "Target 6.4 requires efficient withdrawals and usage across agriculture, industry, and municipal systems.",
+      whyTrue: "Target 6.4 monitors freshwater withdrawal intensity (Indicator 6.4.1 for water-use efficiency over gross value added, and 6.4.2 for water stress levels) to prevent catastrophic resource exhaustion."
+    },
+    {
+      id: "t4-24", topic: "t4", topicName: "Topic 4: Water Ecosystems",
+      title: "Water-Related Ecosystems",
+      question: "Target 6.5 and 6.6 require the protection of freshwater ecosystems including rivers, aquifers, lakes, mountains, and what other biomes?",
+      answer: "Wetlands and forests",
+      aliases: ["wetlands", "forests", "wetlands and forests"],
+      options: ["Wetlands and forests", "Deserts and savannahs", "Coral reefs and oceans", "Tundras and steppes"],
+      explanation: "Forests, wetlands, rivers, and aquifers serve as critical natural infrastructure supporting the freshwater cycle.",
+      whyTrue: "Target 6.6 specifically protects water-dependent natural filters and sponges—forests regulate precipitation and wetlands absorb floods while purifying groundwater before it reaches reservoirs."
+    },
+    {
+      id: "t4-25", topic: "t4", topicName: "Topic 4: Climate Resilience",
+      title: "Climate-Induced Water Disasters",
+      question: "Climate change intensifies water challenges primarily through which two contrasting disaster forms?",
+      answer: "Floods and droughts",
+      aliases: ["floods and droughts", "floods droughts", "droughts and floods"],
+      options: ["Tsunamis and blizzards", "Floods and droughts", "Tornadoes and sinkholes", "Heatwaves and avalanches"],
+      explanation: "Climate variability destabilizes rainfall patterns, severely magnifying extreme flood and drought cycles.",
+      whyTrue: "Thermodynamics dictates that warmer air holds more moisture, resulting in extended dry spells and arid droughts punctuated by sudden atmospheric downpours that trigger severe inland floods."
+    },
+    {
+      id: "t4-26", topic: "t4", topicName: "Topic 4: Water Resource Management",
+      title: "IWRM and Transboundary Cooperation",
+      question: "What is the acronym for the integrated approach to managing water across sectors and borders promoted in Target 6.5?",
+      answer: "IWRM",
+      aliases: ["iwrm", "integrated water resource management", "integrated water resources management"],
+      options: ["WASH", "IWRM", "HLAG", "UNEP"],
+      explanation: "Integrated Water Resources Management (IWRM) coordinates water, land, and related resources without compromising ecosystems.",
+      whyTrue: "Target 6.5 specifically implements IWRM to stop competitive squandering between agricultural irrigation, hydropower dams, and municipal water utilities across common river basins."
+    },
+    {
+      id: "t4-27", topic: "t4", topicName: "Topic 4: Community Participation",
+      title: "Local Community Involvement",
+      question: "Which target promotes supporting and strengthening the participation of local communities in improving water and sanitation management?",
+      answer: "Target 6.b",
+      aliases: ["target 6.b", "6.b"],
+      options: ["Target 6.4", "Target 6.a", "Target 6.b", "Target 17.1"],
+      explanation: "Target 6.b ensures operational success by connecting infrastructure directly to community ownership and end-user needs.",
+      whyTrue: "Top-down pipe projects routinely fail; Target 6.b tracks operational procedures in local communities to manage rural boreholes and maintain neighborhood water points."
+    },
+    {
+      id: "t4-28", topic: "t4", topicName: "Topic 4: Sustainable Transport",
+      title: "Transport & Public Health",
+      question: "Sustainable transport improves public health by reducing road casualties, increasing active mobility, and improving what environmental factor?",
+      answer: "Urban air quality",
+      aliases: ["air quality", "urban air quality", "clean air"],
+      options: ["Urban air quality", "Water hardness", "Soil nitrogen", "Pest control"],
+      explanation: "Clean public transport networks curb toxic vehicle emissions, directly reducing urban respiratory and cardiovascular diseases.",
+      whyTrue: "Transitioning to electrified mass transit and cycling removes diesel particulate matter (PM2.5) and nitrogen oxides, preventing thousands of premature asthma, stroke, and cardiovascular deaths."
+    },
+    {
+      id: "t4-29", topic: "t4", topicName: "Topic 4: Transport & Climate",
+      title: "Energy-Related Emissions from Transport",
+      question: "Approximately what fraction of global energy-related greenhouse gas emissions originates from the transport sector?",
+      answer: "One-quarter",
+      aliases: ["one-quarter", "one quarter", "1/4", "close to a quarter", "25%"],
+      options: ["One-tenth", "One-quarter", "One-half", "Two-thirds"],
+      explanation: "Nearly a quarter (25%) of energy-related emissions stem from transport, making it vital for Paris Agreement targets.",
+      whyTrue: "International Energy Agency (IEA) and IPCC reports verify that motorized mobility, aviation, and freight logistics produce approximately 23% to 25% of energy-derived carbon emissions."
+    },
+    {
+      id: "t4-30", topic: "t4", topicName: "Topic 4: Healthy Communities",
+      title: "Integrated Systems for Health",
+      question: "True health outcomes cannot be separated from what broader system of everyday conditions?",
+      answer: "Social, environmental, and infrastructural conditions",
+      aliases: ["social environmental and infrastructural", "environment and infrastructure", "integrated systems", "living conditions"],
+      options: ["Hospitals and pharmacies alone", "Social, environmental, and infrastructural conditions", "Private medical insurance schemes", "Genetic factors exclusively"],
+      explanation: "Health is an integrated outcome shaped by clean water, clean air, sanitation, safe mobility, and resilient living environments.",
+      whyTrue: "Clinical medicine accounts for only a fraction of overall population health; the social determinants of health (clean water, housing, clean air, and infrastructure) determine whether illnesses occur in the first place."
+    },
+
+    // --- TOPIC 5: Education, Gender, Capability, Empowerment (31 to 60) ---
+    {
+      id: "t5-1", topic: "t5", topicName: "Topic 5: Education & Capability",
+      title: "Education as an Enabler",
+      question: "Which goal seeks to ensure inclusive and equitable quality education and promote lifelong learning opportunities for all?",
+      answer: "SDG 4",
+      aliases: ["sdg 4", "sdg4", "goal 4"],
+      options: ["SDG 2", "SDG 4", "SDG 8", "SDG 10"],
+      explanation: "SDG 4 operates both as a distinct human development right and as a master enabler for achieving all other sustainable goals.",
+      whyTrue: "SDG 4 is the universal blueprint for learning, moving beyond mere basic schooling to establish equitable, quality, lifelong instruction from early childhood through adulthood."
+    },
+    {
+      id: "t5-2", topic: "t5", topicName: "Topic 5: ESD Definition",
+      title: "Education for Sustainable Development",
+      question: "What is the acronym for integrating sustainability values, principles, and practices into all forms of learning?",
+      answer: "ESD",
+      aliases: ["esd", "education for sustainable development"],
+      options: ["MDG", "ESD", "HESI", "GEM"],
+      explanation: "Education for Sustainable Development (ESD) equips learners with the knowledge and values needed to build sustainable societies.",
+      whyTrue: "UNESCO codifies ESD as the methodology that transforms education into a tool for environmental stewardship, economic viability, and social justice."
+    },
+    {
+      id: "t5-3", topic: "t5", topicName: "Topic 5: Intergenerational Responsibility",
+      title: "Brundtland Report Definition (1987)",
+      question: "Which landmark 1987 report first defined sustainable development as meeting present needs without compromising future generations?",
+      answer: "Our Common Future",
+      aliases: ["our common future", "brundtland report", "brundtland"],
+      options: ["Agenda 21", "The Future We Want", "Our Common Future", "Dakar Framework"],
+      explanation: "The World Commission on Environment and Development published 'Our Common Future', establishing this bedrock principle.",
+      whyTrue: "The Brundtland Commission published 'Our Common Future' in 1987, anchoring the legal and philosophical definition of intergenerational equity across all modern UN development frameworks."
+    },
+    {
+      id: "t5-4", topic: "t5", topicName: "Topic 5: Transformative Force",
+      title: "UN Decade of ESD",
+      question: "Which UN agency launched and led the United Nations Decade of Education for Sustainable Development (2005–2014)?",
+      answer: "UNESCO",
+      aliases: ["unesco"],
+      options: ["UNICEF", "UNESCO", "UNEP", "UNDP"],
+      explanation: "UNESCO coordinated the UN Decade of ESD, culminating in the 2014 World Conference in Nagoya, Japan.",
+      whyTrue: "As the specialized UN agency for intellectual cooperation and learning, UNESCO was formally appointed by the UN General Assembly to steer the 2005–2014 Decade of ESD."
+    },
+    {
+      id: "t5-5", topic: "t5", topicName: "Topic 5: Basic Education",
+      title: "Free and Quality Primary/Secondary Education",
+      question: "Target 4.1 seeks to ensure that all girls and boys complete free, equitable, and quality primary and secondary schooling leading to what?",
+      answer: "Relevant and effective learning outcomes",
+      aliases: ["effective learning outcomes", "relevant and effective learning outcomes", "learning outcomes"],
+      options: ["High school diplomas", "Standardized test certificates", "Relevant and effective learning outcomes", "Employment offers"],
+      explanation: "Target 4.1 emphasizes that physical enrollment or completion is futile unless students achieve genuine learning competencies.",
+      whyTrue: "Target 4.1 explicitly shifts the focus from physical attendance ('bums in seats') to meaningful cognitive achievement, tracked by proficiency in reading and mathematics."
+    },
+    {
+      id: "t5-6", topic: "t5", topicName: "Topic 5: Learning Outcomes",
+      title: "Foundational Minimum Proficiency",
+      question: "Under Indicator 4.1.1, minimum student proficiency is specifically monitored across which two foundational subject domains?",
+      answer: "Reading and mathematics",
+      aliases: ["reading and mathematics", "reading and math", "literacy and numeracy"],
+      options: ["Science and history", "Reading and mathematics", "Digital literacy and civics", "Language and arts"],
+      explanation: "Indicator 4.1.1 assesses reading and math proficiency at grades 2/3, end of primary, and lower secondary school.",
+      whyTrue: "Reading and mathematics serve as the two universal prerequisites for higher-order learning; without basic literacy and numeracy, all subsequent education stalls."
+    },
+    {
+      id: "t5-7", topic: "t5", topicName: "Topic 5: Early Childhood",
+      title: "Early Childhood Development & Pre-Primary",
+      question: "Target 4.2 focuses on early childhood development and care so that young children are developmentally on track and prepared for what?",
+      answer: "Primary education",
+      aliases: ["primary education", "primary school", "formal schooling"],
+      options: ["Secondary education", "Primary education", "Vocational apprenticeships", "Language certifications"],
+      explanation: "Quality early care and pre-primary education ensure foundational cognitive and psychosocial readiness for primary school.",
+      whyTrue: "Neurological research demonstrates that early childhood nutrition and care determine cognitive readiness; Target 4.2 ensures children are developmentally prepared before entering Grade 1."
+    },
+    {
+      id: "t5-8", topic: "t5", topicName: "Topic 5: Higher Education",
+      title: "Vocational and Tertiary Education",
+      question: "Target 4.3 guarantees equal access for all women and men to affordable and quality technical, vocational, and what other education?",
+      answer: "Tertiary education",
+      aliases: ["tertiary education", "tertiary", "university", "higher education"],
+      options: ["Tertiary education", "Religious education", "Military education", "Specialized physical training"],
+      explanation: "Target 4.3 explicitly mandates equitable, affordable access to university and tertiary institutions.",
+      whyTrue: "Modern high-value economies depend on advanced knowledge; Target 4.3 guarantees that higher technical colleges and universities remain accessible regardless of gender or economic background."
+    },
+    {
+      id: "t5-9", topic: "t5", topicName: "Topic 5: Skills for Work",
+      title: "Skills for Employment & Entrepreneurship",
+      question: "Target 4.4 seeks to substantially increase the number of youth and adults possessing technical and vocational skills for employment and what?",
+      answer: "Entrepreneurship",
+      aliases: ["entrepreneurship", "decent jobs and entrepreneurship"],
+      options: ["Civil service", "Corporate administration", "Entrepreneurship", "Manual labor"],
+      explanation: "Target 4.4 bridges education and economic growth by preparing learners for decent employment and business creation.",
+      whyTrue: "Target 4.4 was designed to counter youth unemployment by training students not only for salaried corporate positions but also with the self-starting skills required for entrepreneurship."
+    },
+    {
+      id: "t5-10", topic: "t5", topicName: "Topic 5: Digital Skills",
+      title: "ICT Skills Monitoring",
+      question: "Which specific category of technical skills is monitored under Indicator 4.4.1 as vital for modern economies?",
+      answer: "ICT skills",
+      aliases: ["ict skills", "ict", "information and communications technology", "digital skills"],
+      options: ["Mechanical machining", "ICT skills", "Agricultural harvesting", "Typing speed"],
+      explanation: "Indicator 4.4.1 tracks information and communications technology (ICT) competencies among youth and adults.",
+      whyTrue: "Digital literacy is no longer optional; Indicator 4.4.1 tracks 9 concrete ICT skills—ranging from copying files to coding—as essential indicators of workplace readiness."
+    },
+    {
+      id: "t5-11", topic: "t5", topicName: "Topic 5: Educational Equity",
+      title: "Parity Indices in Education",
+      question: "Target 4.5 aims to eliminate gender disparities and guarantee equal access for vulnerable groups including persons with disabilities and who else?",
+      answer: "Indigenous peoples",
+      aliases: ["indigenous peoples", "indigenous", "children in vulnerable situations"],
+      options: ["Foreign tourists", "Indigenous peoples", "Expatriates", "Corporate executives"],
+      explanation: "Target 4.5 uses parity indices (female/male, rural/urban) to ensure indigenous, disabled, and vulnerable groups are not left behind.",
+      whyTrue: "National averages frequently disguise deep regional inequality; Target 4.5 uses parity indices to safeguard historically neglected indigenous tribes, children in conflict zones, and disabled learners."
+    },
+    {
+      id: "t5-12", topic: "t5", topicName: "Topic 5: Literacy & Numeracy",
+      title: "Adult Functional Literacy",
+      question: "Target 4.6 ensures that all youth and a substantial proportion of which group achieve functional literacy and numeracy?",
+      answer: "Adults",
+      aliases: ["adults", "adult men and women"],
+      options: ["Preschoolers", "Adults", "University graduates only", "Migrant workers only"],
+      explanation: "Target 4.6 mandates that literacy and numeracy must extend across adult populations, not merely school-aged children.",
+      whyTrue: "Over 750 million adults globally cannot read or write; Target 4.6 explicitly obligates states to provide remedial literacy to adults who missed schooling during childhood."
+    },
+    {
+      id: "t5-13", topic: "t5", topicName: "Topic 5: Lifelong Learning",
+      title: "Continuous Lifelong Learning",
+      question: "SDG 4 explicitly promotes lifelong learning opportunities to allow individuals to adapt to changing technologies, economies, and what?",
+      answer: "Employment conditions",
+      aliases: ["employment conditions", "societies", "work environments"],
+      options: ["Employment conditions", "Retirement ages", "Immigration policies", "Political regimes"],
+      explanation: "Lifelong learning provides opportunities for ongoing reskilling and upskilling throughout every phase of adult life.",
+      whyTrue: "Rapid artificial intelligence and economic shifts make career skills obsolete quickly; lifelong learning guarantees continuous upskilling across an individual's working lifetime."
+    },
+    {
+      id: "t5-14", topic: "t5", topicName: "Topic 5: Global Citizenship",
+      title: "GCED and Peace",
+      question: "Target 4.7 promotes education for sustainable development alongside which framework preparing learners for responsible world participation?",
+      answer: "Global citizenship education",
+      aliases: ["global citizenship", "global citizenship education", "gced"],
+      options: ["Nationalist defense training", "Global citizenship education", "Foreign diplomatic service", "Export trade instruction"],
+      explanation: "Global Citizenship Education (GCED) teaches human rights, cultural appreciation, and non-violence in an interconnected world.",
+      whyTrue: "Target 4.7 blends technical environmental ESD with GCED to instill values of mutual tolerance, global solidarity, universal human rights, and environmental empathy."
+    },
+    {
+      id: "t5-15", topic: "t5", topicName: "Topic 5: Culture of Peace",
+      title: "Peace and Non-Violence Values",
+      question: "Under Target 4.7, appreciation of cultural diversity and human rights is directly paired with the promotion of a culture of what?",
+      answer: "Peace and non-violence",
+      aliases: ["peace and non-violence", "peace and nonviolence", "peace"],
+      options: ["Military deterrence", "Peace and non-violence", "National conformity", "Strict isolation"],
+      explanation: "SDG 4 embeds peaceful dispute resolution, mutual understanding, and human rights as core curricular values.",
+      whyTrue: "The formal text of Target 4.7 obligates national curricula to actively teach non-violence, appreciation of cultural diversity, and human rights to prevent conflict."
+    },
+    {
+      id: "t5-16", topic: "t5", topicName: "Topic 5: Safe Learning Spaces",
+      title: "Upgraded Inclusive Facilities",
+      question: "Target 4.a requires upgrading educational facilities to make them child, disability, and what sensitive?",
+      answer: "Gender sensitive",
+      aliases: ["gender sensitive", "gender-sensitive", "gender"],
+      options: ["Climate proof", "Gender sensitive", "Acoustically isolated", "Commercially viable"],
+      explanation: "Target 4.a insists that learning facilities provide safe, non-violent, inclusive, and gender-sensitive environments.",
+      whyTrue: "Without separate, clean sanitation facilities and safe infrastructure, adolescent girls frequently drop out of secondary schools during menstruation; Target 4.a directly mandates gender-sensitive facilities."
+    },
+    {
+      id: "t5-17", topic: "t5", topicName: "Topic 5: Qualified Teachers",
+      title: "Teacher Training & Supply",
+      question: "Target 4.c calls for substantially increasing the supply of qualified teachers through international cooperation in what group of nations?",
+      answer: "Developing countries",
+      aliases: ["developing countries", "least developed countries", "ldcs", "sids"],
+      options: ["OECD nations", "Developing countries", "High-income states", "G7 countries"],
+      explanation: "Target 4.c addresses structural teacher shortages in developing countries, LDCs, and Small Island Developing States.",
+      whyTrue: "School buildings are empty shells without trained pedagogy. Target 4.c mobilizes international development aid to train certified teachers in LDCs and SIDS."
+    },
+    {
+      id: "t5-18", topic: "t5", topicName: "Topic 5: Higher Education Initiative",
+      title: "Higher Education Sustainability Initiative",
+      question: "What is the name of the UN partnership that mobilizes universities to green campuses and teach sustainable development?",
+      answer: "HESI",
+      aliases: ["hesi", "higher education sustainability initiative"],
+      options: ["HESI", "UNEP-Campus", "UNESCO-Uni", "GreenLeague"],
+      explanation: "The Higher Education Sustainability Initiative (HESI) accounts for over one-third of voluntary commitments from Rio+20.",
+      whyTrue: "Formed at Rio+20, HESI directly links university chancellors and academic faculties to integrate climate action, green research, and sustainable campus operations."
+    },
+    {
+      id: "t5-19", topic: "t5", topicName: "Topic 5: Gender as Driver",
+      title: "Gender Equality as a Driver of Progress",
+      question: "Which Secretary-General emphasized in 'We the Peoples' (2011) that women's unrealized potential holds back global development?",
+      answer: "Ban Ki-moon",
+      aliases: ["ban ki-moon", "ban ki moon"],
+      options: ["Kofi Annan", "Ban Ki-moon", "António Guterres", "Boutros Boutros-Ghali"],
+      explanation: "Ban Ki-moon underscored that persistent inequalities prevent societies from benefiting from the full capabilities of women.",
+      whyTrue: "In his report to the 66th Session of the UN General Assembly, Ban Ki-moon declared that gender equality is not just a moral imperative, but the single largest developmental multiplier."
+    },
+    {
+      id: "t5-20", topic: "t5", topicName: "Topic 5: Gender Discrimination",
+      title: "Legal Frameworks Against Discrimination",
+      question: "Target 5.1 focuses on ending all forms of discrimination against women and girls by tracking whether what are in place?",
+      answer: "Legal frameworks",
+      aliases: ["legal frameworks", "laws", "legislation"],
+      options: ["Voluntary guidelines", "Legal frameworks", "Corporate pledges", "Private arbitration"],
+      explanation: "Indicator 5.1.1 measures whether legal frameworks exist to promote, enforce, and monitor non-discrimination based on sex.",
+      whyTrue: "Customary practices can violate human rights unless bound by statutory law; Indicator 5.1.1 measures whether constitutional and statutory laws actively ban sex-based discrimination."
+    },
+    {
+      id: "t5-21", topic: "t5", topicName: "Topic 5: Eliminating Violence",
+      title: "Ending Violence Against Women",
+      question: "Target 5.2 targets the elimination of all forms of violence against women in which two spheres of life?",
+      answer: "Public and private spheres",
+      aliases: ["public and private", "public and private spheres", "public and private life"],
+      options: ["Online and print", "Workplace and commute", "Public and private spheres", "Domestic and legal"],
+      explanation: "Target 5.2 encompasses domestic intimate-partner abuse, public assaults, and human trafficking/exploitation.",
+      whyTrue: "Historical laws often dismissed domestic abuse as a private marital matter; Target 5.2 explicitly holds governments accountable for violence in both private homes and public spaces."
+    },
+    {
+      id: "t5-22", topic: "t5", topicName: "Topic 5: Harmful Practices",
+      title: "Eliminating Harmful Practices",
+      question: "Target 5.3 specifically aims to eliminate child/early/forced marriage and which other harmful practice?",
+      answer: "Female genital mutilation",
+      aliases: ["female genital mutilation", "fgm", "fgm/c"],
+      options: ["Dowry rituals", "Female genital mutilation", "Unregulated cosmetic surgery", "School expulsions"],
+      explanation: "Target 5.3 monitors the eradication of both child marriage and female genital mutilation/cutting.",
+      whyTrue: "Target 5.3 explicitly groups child marriage (5.3.1) and female genital mutilation (5.3.2) as violent, rights-violating practices that must be completely eradicated by 2030."
+    },
+    {
+      id: "t5-23", topic: "t5", topicName: "Topic 5: Unpaid Domestic Care",
+      title: "Valuing Unpaid Care Work",
+      question: "Target 5.4 addresses the disproportionate burden of unpaid care and domestic work through public services, infrastructure, and what policy?",
+      answer: "Social protection policies",
+      aliases: ["social protection", "social protection policies", "shared responsibility"],
+      options: ["Wage caps", "Mandatory overtime", "Social protection policies", "Corporate subsidies"],
+      explanation: "Target 5.4 promotes shared household responsibility and safety nets to value unpaid caregiving and domestic work.",
+      whyTrue: "Women perform more than triple the hours of unpaid domestic and elder/childcare compared to men; Target 5.4 mandates public daycares, piped water, and parental leave to equalize this burden."
+    },
+    {
+      id: "t5-24", topic: "t5", topicName: "Topic 5: Women in Leadership",
+      title: "Decision-Making & Representation",
+      question: "Target 5.5 measures women's leadership representation through managerial positions and seats held in local governments and what else?",
+      answer: "National parliaments",
+      aliases: ["national parliaments", "parliaments", "congress", "legislatures"],
+      options: ["Corporate boards only", "National parliaments", "Supreme courts", "Military staff"],
+      explanation: "Indicator 5.5.1 tracks the proportion of seats held by women in national parliaments and local governmental bodies.",
+      whyTrue: "True political empowerment requires legislative voting power; Indicator 5.5.1 explicitly audits the percentage of seats held by women in national congresses and municipal councils."
+    },
+    {
+      id: "t5-25", topic: "t5", topicName: "Topic 5: Reproductive Autonomy",
+      title: "Bodily & Reproductive Autonomy",
+      question: "Indicator 5.6.1 measures the proportion of women aged 15–49 who make their own informed decisions regarding contraceptive use, reproductive health, and what?",
+      answer: "Sexual relations",
+      aliases: ["sexual relations", "sex", "marital relations"],
+      options: ["Marriage age", "Sexual relations", "Employment contracts", "Child naming"],
+      explanation: "Indicator 5.6.1 specifically evaluates autonomy regarding sexual relations, contraceptive choice, and healthcare decisions.",
+      whyTrue: "Bodily autonomy requires consent; Indicator 5.6.1 measures three interdependent decision-making powers: contraceptive usage, accessing healthcare, and the right to say no to sexual relations."
+    },
+    {
+      id: "t5-26", topic: "t5", topicName: "Topic 5: Women's Economic Rights",
+      title: "Asset Ownership & Financial Rights",
+      question: "Target 5.a mandates reforms to give women equal rights to economic resources, financial services, inheritance, and ownership over what?",
+      answer: "Land and property",
+      aliases: ["land and property", "land", "property", "agricultural land"],
+      options: ["Vehicles", "Land and property", "Patents", "Commodities"],
+      explanation: "Target 5.a ensures women have full legal and customary ownership and control over land and productive property.",
+      whyTrue: "In many patriarchal inheritance systems, widows and daughters are legally disinherited; Target 5.a mandates legal reforms guaranteeing equal rights to real estate, land titles, and credit."
+    },
+    {
+      id: "t5-27", topic: "t5", topicName: "Topic 5: Agricultural Land Rights",
+      title: "Agricultural Land Tenure",
+      question: "Under Indicator 5.a.1, what specific agricultural metric is disaggregated by sex to evaluate female agency?",
+      answer: "Ownership or secure rights over agricultural land",
+      aliases: ["land ownership", "ownership or secure rights over agricultural land", "agricultural land rights"],
+      options: ["Crop yield per acre", "Ownership or secure rights over agricultural land", "Tractor usage hours", "Fertilizer purchase quotas"],
+      explanation: "Secure tenure over agricultural land provides rural women with essential economic security, credit, and resilience.",
+      whyTrue: "While women constitute the majority of smallholder food growers in sub-Saharan Africa and Asia, fewer than 15% hold legal deeds; Indicator 5.a.1 measures agricultural tenure security."
+    },
+    {
+      id: "t5-28", topic: "t5", topicName: "Topic 5: Enabling Technology",
+      title: "ICT for Women's Empowerment",
+      question: "Which enabling technology is specifically tracked under Indicator 5.b.1 to evaluate digital access and women's empowerment?",
+      answer: "Mobile telephone",
+      aliases: ["mobile telephone", "mobile phone", "smartphones", "mobile phones"],
+      options: ["Personal computers", "Mobile telephone", "Radio sets", "Satellite receivers"],
+      explanation: "Indicator 5.b.1 tracks mobile phone ownership by sex as an instrument for digital inclusion and economic participation.",
+      whyTrue: "Mobile phones deliver digital banking, crop pricing, maternal telemedicine, and personal safety; Indicator 5.b.1 measures individual mobile phone ownership by sex."
+    },
+    {
+      id: "t5-29", topic: "t5", topicName: "Topic 5: Budget Tracking for Equality",
+      title: "Gender Allocations & Budget Systems",
+      question: "Indicator 5.c.1 tracks whether countries have systems in place to track and publish public budget allocations for what cause?",
+      answer: "Gender equality and women's empowerment",
+      aliases: ["gender equality", "gender equality and women's empowerment", "women's empowerment"],
+      options: ["Environmental protection", "Defense initiatives", "Gender equality and women's empowerment", "Foreign export aids"],
+      explanation: "Indicator 5.c.1 ensures government policy commitments are substantiated by transparent, tracked public funding.",
+      whyTrue: "Policies without funding are ineffective; Indicator 5.c.1 measures gender-responsive budgeting, ensuring national treasuries publicly track fiscal allocations for female programs."
+    },
+    {
+      id: "t5-30", topic: "t5", topicName: "Topic 5: Capability & Empowerment",
+      title: "Capabilities Approach to Development",
+      question: "While education develops internal human knowledge and capabilities, what removes the social barriers preventing those capabilities from being exercised?",
+      answer: "Gender equality",
+      aliases: ["gender equality", "equality", "women's empowerment"],
+      options: ["Industrial subsidies", "Gender equality", "Technological automation", "Tax restructuring"],
+      explanation: "Capability without empowerment leaves human potential suppressed; education and gender equality must function as joint pillars.",
+      whyTrue: "Amartya Sen's capabilities framework proves that an educated woman who is legally barred from employment or bank loans cannot utilize her human capital; equality converts education into actual societal agency."
+    },
+
+    // --- TOPIC 6: Sustainable Energy, Infrastructure, Integrated Development (61 to 90) ---
+    {
+      id: "t6-1", topic: "t6", topicName: "Topic 6: Energy Priority",
+      title: "SDG 7 Energy Mandate",
+      question: "Which goal seeks to ensure access to affordable, reliable, sustainable, and modern energy for all?",
+      answer: "SDG 7",
+      aliases: ["sdg 7", "sdg7", "goal 7"],
+      options: ["SDG 6", "SDG 7", "SDG 9", "SDG 12"],
+      explanation: "SDG 7 sits at the center of both the 2030 Agenda and global emissions mitigation strategies.",
+      whyTrue: "Goal 7 is universally titled 'Ensure access to affordable, reliable, sustainable and modern energy for all', acting as the lifeblood of transport, lighting, industry, and communications."
+    },
+    {
+      id: "t6-2", topic: "t6", topicName: "Topic 6: Universal Energy Access",
+      title: "Target 7.1 Universal Access",
+      question: "Target 7.1 aims to achieve universal access to affordable, reliable, and modern energy services by what year?",
+      answer: "2030",
+      aliases: ["2030"],
+      options: ["2025", "2030", "2040", "2050"],
+      explanation: "By 2030, Target 7.1 aims to eliminate basic energy poverty across off-grid and underserved communities.",
+      whyTrue: "All core developmental milestones under the UN Transforming Our World compact are timed to complete by 2030, with Target 7.1 focusing on universal modern energy by that deadline."
+    },
+    {
+      id: "t6-3", topic: "t6", topicName: "Topic 6: Electricity Access",
+      title: "Electricity Coverage",
+      question: "What basic infrastructure measure serves as Indicator 7.1.1 to evaluate modern economic participation?",
+      answer: "Proportion of population with access to electricity",
+      aliases: ["access to electricity", "electricity access", "proportion of population with access to electricity"],
+      options: ["Per-capita oil consumption", "Proportion of population with access to electricity", "Total grid voltage capacity", "Hydropower kilowatt output"],
+      explanation: "Electricity access provides the essential foundation for lighting, clinics, communications, and digital commerce.",
+      whyTrue: "Indicator 7.1.1 calculates the percentage of households connected to national electricity grids or dependable off-grid solar micro-systems."
+    },
+    {
+      id: "t6-4", topic: "t6", topicName: "Topic 6: Clean Cooking & Fuels",
+      title: "Clean Fuels and Technologies",
+      question: "Target 7.1 also tracks reliance on clean fuels and technologies primarily to prevent indoor air pollution from traditional what?",
+      answer: "Household cooking and heating",
+      aliases: ["cooking", "clean cooking", "household cooking", "cooking and heating"],
+      options: ["Automobile transit", "Household cooking and heating", "Industrial furnaces", "Agricultural drying"],
+      explanation: "Burning firewood and biomass indoors causes severe respiratory illness; clean cooking fuels directly preserve lives.",
+      whyTrue: "Indicator 7.1.2 monitors access to clean cookstoves, biogas, and LPG, reducing household smoke exposure that causes over 3 million premature deaths annually."
+    },
+    {
+      id: "t6-5", topic: "t6", topicName: "Topic 6: Energy & Economy",
+      title: "Energy as Economic Multiplier",
+      question: "Reliable modern energy stimulates economic opportunity and employment primarily by powering productive activities and what?",
+      answer: "Livelihoods and businesses",
+      aliases: ["businesses", "livelihoods and businesses", "enterprises", "services"],
+      options: ["Speculative finance", "Livelihoods and businesses", "Government bureaucracies", "Foreign imports"],
+      explanation: "Power is indispensable for refrigeration, industrial processing, tech services, and micro-enterprises.",
+      whyTrue: "Without constant electricity, factories cannot run assembly lines, shops cannot keep food fresh, and technicians cannot operate machinery, suppressing commercial livelihoods."
+    },
+    {
+      id: "t6-6", topic: "t6", topicName: "Topic 6: Energy & Education",
+      title: "Energy & Educational Outcomes",
+      question: "Modern energy directly improves education by enabling evening study lighting, digital classrooms, and powering what in schools?",
+      answer: "Educational equipment and computers",
+      aliases: ["computers", "ict", "digital tools", "educational equipment"],
+      options: ["School transport buses", "Educational equipment and computers", "Sports stadium floodlights", "Automated grading systems"],
+      explanation: "Electrified schools allow digital connectivity, laboratory learning, and evening educational access.",
+      whyTrue: "Schools with power connections can operate laboratory computers, audiovisual projectors, and evening study sessions, boosting literacy and student retention."
+    },
+    {
+      id: "t6-7", topic: "t6", topicName: "Topic 6: Energy & Health",
+      title: "Powering Health Clinics",
+      question: "In healthcare facilities, reliable electricity is critically required to power lifesaving equipment and maintain cold chains for what?",
+      answer: "Vaccines and medicines",
+      aliases: ["vaccines", "vaccines and medicines", "medicines", "cold chain"],
+      options: ["Vaccines and medicines", "Paper archive storage", "Visitor vending machines", "Security badge systems"],
+      explanation: "Without refrigeration and dependable power, health clinics cannot preserve vaccines or conduct emergency surgery.",
+      whyTrue: "Most biological vaccines, insulin, and blood supplies spoil rapidly if not refrigerated between 2°C and 8°C, making reliable power a non-negotiable requirement for clinical health."
+    },
+    {
+      id: "t6-8", topic: "t6", topicName: "Topic 6: Energy & Gender",
+      title: "Alleviating Women's Fuel Burden",
+      question: "Clean domestic energy empowers women by dramatically reducing the hours spent gathering fuel and suffering exposure to what?",
+      answer: "Toxic smoke and indoor pollution",
+      aliases: ["toxic smoke", "indoor air pollution", "smoke", "indoor pollution"],
+      options: ["Toxic smoke and indoor pollution", "Direct sunlight", "Waterborne bacteria", "Roadside traffic noise"],
+      explanation: "Collecting firewood consumes immense unpaid time and burning biomass creates lethal domestic particulate pollution.",
+      whyTrue: "In developing rural economies, women and daughters spend hours daily hauling firewood and inhaling soot; clean cookstoves free up productive hours and prevent pulmonary disease."
+    },
+    {
+      id: "t6-9", topic: "t6", topicName: "Topic 6: Inclusive Communities",
+      title: "Equitable Power Distribution",
+      question: "Universal energy access prevents electricity and modern fuels from becoming exclusive privileges for which group?",
+      answer: "Economically or geographically advantaged populations",
+      aliases: ["advantaged populations", "the wealthy", "the rich", "urban elites"],
+      options: ["Government officials only", "Economically or geographically advantaged populations", "Foreign investors", "Corporate executives"],
+      explanation: "Fair energy policies extend off-grid solar and infrastructure to isolated rural and low-income communities.",
+      whyTrue: "Allowing power utilities to cherry-pick only profitable, dense cities deepens spatial and class divides; universality guarantees energy access for isolated rural communities."
+    },
+    {
+      id: "t6-10", topic: "t6", topicName: "Topic 6: Renewable Energy",
+      title: "Target 7.2 Renewable Share",
+      question: "What does Target 7.2 seek to substantially increase in the global energy mix by 2030?",
+      answer: "Renewable energy",
+      aliases: ["renewable energy", "renewables", "share of renewable energy"],
+      options: ["Nuclear energy", "Renewable energy", "Refined petroleum", "Natural gas capture"],
+      explanation: "Target 7.2 targets solar, wind, geothermal, and hydro generation to transition away from fossil-fuel dependence.",
+      whyTrue: "Target 7.2 tracks renewable energy share (Indicator 7.2.1) across electricity, thermal heating, and transport to replace fossil fuels with clean solar, wind, hydro, and geothermal energy."
+    },
+    {
+      id: "t6-11", topic: "t6", topicName: "Topic 6: Energy Efficiency",
+      title: "Target 7.3 Doubling Efficiency",
+      question: "Target 7.3 aims to accomplish what global rate change regarding energy efficiency by 2030?",
+      answer: "Double the global rate of improvement",
+      aliases: ["double", "double the rate", "double the global rate of improvement"],
+      options: ["Triple the efficiency index", "Double the global rate of improvement", "Halve total industrial energy", "Eliminate efficiency gaps"],
+      explanation: "Efficiency entails getting higher economic output from less primary energy through better standards and smart design.",
+      whyTrue: "Generating green energy is only half the battle; Target 7.3 mandates 'doubling the global rate of improvement in energy efficiency' to prevent systemic energy waste."
+    },
+    {
+      id: "t6-12", topic: "t6", topicName: "Topic 6: Energy Intensity",
+      title: "Measuring Energy Intensity",
+      question: "Indicator 7.3.1 measures energy intensity, which calculates primary energy supply per unit of what metric?",
+      answer: "Gross Domestic Product (GDP)",
+      aliases: ["gdp", "gross domestic product", "economic output"],
+      options: ["Population count", "Gross Domestic Product (GDP)", "Total land area", "Export tonnage"],
+      explanation: "A declining energy-to-GDP ratio proves that an economy is decoupling growth from wasteful energy consumption.",
+      whyTrue: "Energy intensity is measured as megajoules per dollar of GDP (MJ/$); lower ratios signify that an economy produces greater commercial value while consuming fewer energy units."
+    },
+    {
+      id: "t6-13", topic: "t6", topicName: "Topic 6: Clean Energy R&D",
+      title: "Target 7.a Research Cooperation",
+      question: "Target 7.a promotes international cooperation to facilitate access to clean energy research, including renewables, efficiency, and advanced what?",
+      answer: "Fossil-fuel technology",
+      aliases: ["fossil-fuel technology", "cleaner fossil-fuel technology", "clean fossil fuels"],
+      options: ["Fossil-fuel technology", "Deep-sea drilling methods", "Coal liquefaction", "Hydraulic fracturing"],
+      explanation: "Target 7.a facilitates cooperative investments in renewables, energy efficiency, and cleaner fossil-fuel research.",
+      whyTrue: "Target 7.a recognizes transitional realities, explicitly supporting shared research and technology transfers covering renewables, energy conservation, and cleaner fossil-fuel technologies."
+    },
+    {
+      id: "t6-14", topic: "t6", topicName: "Topic 6: Infrastructure Investment",
+      title: "Mobilizing Capital for Energy",
+      question: "Achieving universal sustainable energy requires massive capital investments in clean technology and what physical structures?",
+      answer: "Energy infrastructure",
+      aliases: ["energy infrastructure", "infrastructure", "grids and infrastructure"],
+      options: ["Energy infrastructure", "Administrative headquarters", "Commercial skyscrapers", "Highway toll systems"],
+      explanation: "Modernizing smart grids, storage batteries, and distributed generation demands robust financial commitments.",
+      whyTrue: "Solar panels cannot supply cities without transmission lines, substations, and battery storage; building modern power grids requires dedicated, sustained infrastructure investment."
+    },
+    {
+      id: "t6-15", topic: "t6", topicName: "Topic 6: Special Situation Countries",
+      title: "Target 7.b Least Developed States",
+      question: "Target 7.b focuses on expanding infrastructure and upgrading technology to supply modern energy in developing countries, especially LDCs, LLDCs, and what?",
+      answer: "Small Island Developing States (SIDS)",
+      aliases: ["sids", "small island developing states", "small island states"],
+      options: ["Small Island Developing States (SIDS)", "BRICS countries", "G20 economies", "High-income territories"],
+      explanation: "Vulnerable island states and landlocked nations suffer from high fuel-import costs and acute logistical barriers.",
+      whyTrue: "Small Island Developing States (SIDS) and landlocked countries face severe fuel import prices and logistics bottlenecks; Target 7.b directs specialized technology and infrastructure grants to these regions."
+    },
+    {
+      id: "t6-16", topic: "t6", topicName: "Topic 6: International Financial Flows",
+      title: "Public Clean Energy Support",
+      question: "Indicator 7.a.1 measures international financial flows to developing countries in support of clean energy research and what?",
+      answer: "Renewable energy production",
+      aliases: ["renewable energy production", "clean energy production", "renewables"],
+      options: ["Petroleum pipeline construction", "Renewable energy production", "Grid privatization schemes", "Commercial coal extraction"],
+      explanation: "Indicator 7.a.1 tracks official development flows earmarked for renewable deployment in low-income nations.",
+      whyTrue: "Indicator 7.a.1 tracks official international public financial flows into developing nations dedicated to clean energy R&D, hybrid microgrids, and renewable generation installations."
+    },
+    {
+      id: "t6-17", topic: "t6", topicName: "Topic 6: Collective Energy Action",
+      title: "Global Roadmap for Accelerated SDG 7",
+      question: "What UN roadmap was formulated to coordinate cross-sectoral action among governments, finance, and civil society toward 2030 energy goals?",
+      answer: "Global Roadmap for Accelerated SDG 7 Action",
+      aliases: ["global roadmap for accelerated sdg 7 action", "global roadmap", "sdg 7 roadmap"],
+      options: ["Paris Energy Compact", "Global Roadmap for Accelerated SDG 7 Action", "Kyoto Plan of Action", "Vienna Energy Declaration"],
+      explanation: "The Roadmap lays out milestones across institutions to accelerate clean transition financing and technology access.",
+      whyTrue: "Emerging from the UN High-Level Dialogue on Energy, the Global Roadmap for Accelerated SDG 7 Action was adopted to track multi-stakeholder commitments and direct finance toward 2030 targets."
+    },
+    {
+      id: "t6-18", topic: "t6", topicName: "Topic 6: Climate Resilience",
+      title: "Clean Energy & Adaptation",
+      question: "Transitioning to decentralized renewable systems bolsters climate resilience by avoiding vulnerability associated with centralized what?",
+      answer: "Centralized fossil-fuel power grids",
+      aliases: ["centralized power grids", "centralized grids", "fossil fuel grids"],
+      options: ["Decentralized solar panels", "Centralized fossil-fuel power grids", "Local micro-hydro stations", "Rooftop battery systems"],
+      explanation: "Distributed renewable microgrids are far more resilient against extreme weather and fuel supply shocks.",
+      whyTrue: "A single transmission breakdown or fuel embargo can plunge millions into darkness on a centralized fossil grid, whereas local renewable microgrids provide independent, resilient local power."
+    },
+    {
+      id: "t6-19", topic: "t6", topicName: "Topic 6: Transport Energy Demand",
+      title: "Transport as Energy Driver",
+      question: "The UN noted that transportation has become the fastest-growing end-use consumer of what commodity globally?",
+      answer: "Energy",
+      aliases: ["energy", "world energy", "power"],
+      options: ["Water", "Energy", "Steel", "Rubber"],
+      explanation: "Transport is the largest end-use of energy in the developed world and the fastest growing one in developing nations.",
+      whyTrue: "UN General Assembly reviews of Agenda 21 established that automotive, air, and freight transport represents the single fastest-growing consumer of global primary energy."
+    },
+    {
+      id: "t6-20", topic: "t6", topicName: "Topic 6: Transport Planning",
+      title: "Johannesburg Plan (JPOI) on Transport",
+      question: "The 2002 Johannesburg Plan of Implementation anchored sustainable transport within infrastructure, public networks, convenience, and what?",
+      answer: "Affordability and efficiency",
+      aliases: ["affordability", "affordability and efficiency", "efficiency"],
+      options: ["Luxury comfort", "Affordability and efficiency", "Private ownership", "Airway dominance"],
+      explanation: "JPOI integrated mass transit with air quality, affordability, social equity, and economic trade integration.",
+      whyTrue: "Section 20 of the JPOI explicitly links transport infrastructure to societal equity, requiring public networks to remain financially affordable, fuel-efficient, and accessible."
+    },
+    {
+      id: "t6-21", topic: "t6", topicName: "Topic 6: Transport Emissions & Paris",
+      title: "Decarbonizing Mobility",
+      question: "Because transport accounts for nearly a quarter of energy greenhouse emissions, transforming mobility is essential to achieving which climate accord?",
+      answer: "Paris Agreement",
+      aliases: ["paris agreement", "the paris agreement"],
+      options: ["Kyoto Protocol", "Montreal Protocol", "Paris Agreement", "Copenhagen Accord"],
+      explanation: "The Paris climate target of 1.5°C cannot be met without electrifying transport and expanding active public transit.",
+      whyTrue: "The Paris Agreement's limit of 1.5°C above pre-industrial levels is mathematically impossible to achieve unless the transport sector (accounting for ~25% of energy emissions) shifts rapidly to zero-carbon fleets."
+    },
+    {
+      id: "t6-22", topic: "t6", topicName: "Topic 6: Water-Energy Nexus",
+      title: "Water-Energy Interdependence",
+      question: "Energy production requires vast amounts of cooling water, while extracting and treating clean water requires immense amounts of what?",
+      answer: "Energy",
+      aliases: ["energy", "electricity", "power"],
+      options: ["Energy", "Labor unions", "Chemical additives", "Sand filtration"],
+      explanation: "The water-energy nexus dictates that resource management decisions in one sector unavoidably impact the other.",
+      whyTrue: "Pumping groundwater, desalination, and sewage processing require massive electrical inputs; simultaneously, thermoelectric and nuclear plants consume billions of liters of water for cooling."
+    },
+    {
+      id: "t6-23", topic: "t6", topicName: "Topic 6: Water Technology",
+      title: "Desalination and Harvesting",
+      question: "To combat severe freshwater scarcity, countries deploy advanced infrastructure including wastewater reuse, harvesting, and what sea-water process?",
+      answer: "Desalination",
+      aliases: ["desalination", "water desalination"],
+      options: ["Desalination", "Cloud condensation", "Canal dredging", "Evaporation pools"],
+      explanation: "Modern desalination and wastewater recycling represent critical technological responses to acute regional water deficits.",
+      whyTrue: "In arid coastal regions, reverse osmosis desalination removes salt from seawater, creating new freshwater supplies where conventional aquifers are depleted."
+    },
+    {
+      id: "t6-24", topic: "t6", topicName: "Topic 6: International Water Cooperation",
+      title: "Target 6.a International Support",
+      question: "Target 6.a promotes international cooperation in water and sanitation programs through capacity-building, technology, and what support?",
+      answer: "Financing and development assistance",
+      aliases: ["financing", "development assistance", "financial support"],
+      options: ["Military protection", "Financing and development assistance", "Commercial water patents", "Privatization waivers"],
+      explanation: "Target 6.a coordinates international aid to build sewage, filtration, and water-harvesting facilities in poor nations.",
+      whyTrue: "Indicator 6.a.1 tracks the total amount of water and sanitation-related Official Development Assistance (ODA) disbursed to low-income countries to fund treatment plants and water storage."
+    },
+    {
+      id: "t6-25", topic: "t6", topicName: "Topic 6: Integrated and Indivisible",
+      title: "Indivisible Nature of the SDGs",
+      question: "The 2030 Agenda defines the 17 Sustainable Development Goals as being integrated and what, balancing economic, social, and environmental dimensions?",
+      answer: "Indivisible",
+      aliases: ["indivisible"],
+      options: ["Isolated", "Indivisible", "Negotiable", "Sequential"],
+      explanation: "The SDGs are indivisible; success in poverty, climate, health, or education cannot be achieved in silos.",
+      whyTrue: "Paragraph 5 of the 2030 Agenda establishes that the SDGs are 'integrated and indivisible', meaning progress cannot be attained by cherry-picking some goals while ignoring others."
+    },
+    {
+      id: "t6-26", topic: "t6", topicName: "Topic 6: Development Synergies",
+      title: "Harnessing Synergies",
+      question: "What term describes the positive dynamic where an intervention in one goal (e.g. clean solar energy) automatically advances several other goals?",
+      answer: "Synergies",
+      aliases: ["synergy", "synergies"],
+      options: ["Trade-offs", "Synergies", "Externalities", "Spillovers"],
+      explanation: "Synergies occur when clean energy simultaneously elevates health (less smoke), education (lights), and emissions cuts.",
+      whyTrue: "A synergy occurs when solving one problem compounds benefits across others—such as electrifying a clinic with solar panels, which simultaneously advances SDG 3 (Health), SDG 7 (Energy), and SDG 13 (Climate)."
+    },
+    {
+      id: "t6-27", topic: "t6", topicName: "Topic 6: Navigating Trade-Offs",
+      title: "Managing Trade-Offs",
+      question: "When prioritizing immediate economic expansion causes negative environmental degradation, policymakers must resolve what dynamic?",
+      answer: "Trade-offs",
+      aliases: ["trade-offs", "tradeoffs", "trade offs"],
+      options: ["Synergies", "Trade-offs", "Consensus", "Collusion"],
+      explanation: "Responsible policymaking explicitly maps trade-offs to avoid solving an immediate crisis while creating long-term catastrophe.",
+      whyTrue: "A development trade-off occurs when advancing one goal generates negative friction with another—such as clearing biodiverse forests (SDG 15) to build agricultural farms (SDG 2)—demanding balanced policy design."
+    },
+    {
+      id: "t6-28", topic: "t6", topicName: "Topic 6: National Planning Integration",
+      title: "Mainstreaming into National Frameworks",
+      question: "The 2019 SDG Summit urged nations to mainstream the 2030 Agenda directly into what domestic instruments?",
+      answer: "National development plans and financial frameworks",
+      aliases: ["national development plans", "national plans", "national planning instruments", "budgets"],
+      options: ["Military budgets", "National development plans and financial frameworks", "Tourist marketing brochures", "Corporate charter filings"],
+      explanation: "Global sustainability goals become reality only when integrated into enforceable national laws, budgets, and plans.",
+      whyTrue: "International declarations lack domestic enforcement until parliaments embed them into binding statutory development plans, fiscal appropriations, and local municipal zoning laws."
+    },
+    {
+      id: "t6-29", topic: "t6", topicName: "Topic 6: Participation & Ownership",
+      title: "National Sustainable Development Strategies (NSDS)",
+      question: "Under Agenda 21, National Sustainable Development Strategies (NSDS) must be developed through what kind of participation?",
+      answer: "Widest possible participation",
+      aliases: ["widest possible participation", "broad participation", "public participation"],
+      options: ["Closed executive sessions", "Widest possible participation", "Corporate-only review", "Foreign consultant oversight"],
+      explanation: "NSDS demands democratic civil society participation, local stakeholder ownership, and thorough contextual analysis.",
+      whyTrue: "Agenda 21 Paragraph 8.7 mandates that national strategies must emerge from the 'widest possible participation' of civil society, indigenous groups, and local businesses to create shared ownership."
+    },
+    {
+      id: "t6-30", topic: "t6", topicName: "Topic 6: Integrated Resource System",
+      title: "Human and Natural System Synthesis",
+      question: "Ultimately, sustainable development treats energy, water, transit, health, and gender equality as parts of what single unified entity?",
+      answer: "An integrated resource and human system",
+      aliases: ["integrated system", "integrated resource and human system", "unified system", "system"],
+      options: ["Independent competitive markets", "An integrated resource and human system", "Sovereign national jurisdictions", "Technocratic engineering puzzles"],
+      explanation: "Human well-being, planetary ecosystems, and resource infrastructures form one continuous, interconnected global system.",
+      whyTrue: "Ecological and socio-economic science proves that humans do not live outside nature; society, governance, resource supplies, and ecosystems form an interconnected global system."
+    }
+  ];
+
+  // Engine State
+  let currentTopic = "all";
+  let currentMode = "mcq";
+  let activeList = [];
+  let currentIndex = 0;
+  let score = 0;
+  let totalAttempts = 0;
+  let streak = 0;
+  let xp = 0;
+  let userMistakes = [];
+  let hasEvaluatedCurrent = false;
+
+  // Sound Engine
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let audioCtx = null;
+
+  function playSynth(freq, type, duration, vol = 0.08) {
+    try {
+      if (!audioCtx) audioCtx = new AudioCtx();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    } catch(e) {}
+  }
+
+  function playSuccessPulse() {
+    playSynth(880, 'sine', 0.08, 0.07);
+    setTimeout(() => playSynth(1320, 'sine', 0.15, 0.08), 50);
+  }
+
+  function playGlitchError() {
+    playSynth(150, 'sawtooth', 0.15, 0.09);
+    setTimeout(() => playSynth(110, 'sawtooth', 0.2, 0.08), 80);
+  }
+
+  function playResetTone() {
+    playSynth(440, 'triangle', 0.1, 0.06);
+    setTimeout(() => playSynth(330, 'triangle', 0.15, 0.05), 60);
+  }
+
+  function initApp() {
+    applyFilters();
+    setupKeyListeners();
+  }
+
+  function setupKeyListeners() {
+    window.addEventListener('keydown', (e) => {
+      if (currentMode === "vault") return;
+
+      if (currentMode === "mcq") {
+        if (!hasEvaluatedCurrent && ['1','2','3','4'].includes(e.key)) {
+          const idx = parseInt(e.key) - 1;
+          const btns = document.querySelectorAll('.opt-btn');
+          if (btns[idx]) btns[idx].click();
+        } else if (hasEvaluatedCurrent && e.key === 'Enter') {
+          nextCard();
+        }
+      }
+    });
+  }
+
+  function applyFilters() {
+    currentTopic = document.getElementById('topicFilter').value;
+    if (currentTopic === "all") {
+      activeList = [...allCurriculum];
+    } else {
+      activeList = allCurriculum.filter(item => item.topic === currentTopic);
+    }
+    activeList.sort(() => Math.random() - 0.5);
+    currentIndex = 0;
+    loadCard();
+  }
+
+  function switchMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+
+    if (mode === "vault") {
+      document.getElementById('deckView').classList.add('hidden');
+      document.getElementById('vaultView').classList.remove('hidden');
+      renderVault();
+      return;
+    }
+
+    document.getElementById('deckView').classList.remove('hidden');
+    document.getElementById('vaultView').classList.add('hidden');
+    loadCard();
+  }
+
+  function loadCard() {
+    hasEvaluatedCurrent = false;
+    const container = document.getElementById('questionContainer');
+    const footer = document.getElementById('actionsFooter');
+    const feedback = document.getElementById('feedbackBox');
+    feedback.className = "feedback";
+    feedback.innerHTML = "";
+
+    if (activeList.length === 0) {
+      container.innerHTML = `<p style="text-align:center; padding: 40px 0; color: var(--text-dim);">No active telemetry stream located.</p>`;
+      footer.innerHTML = "";
+      return;
+    }
+
+    const item = activeList[currentIndex];
+    document.getElementById('tagCategory').textContent = item.topicName.toUpperCase();
+    document.getElementById('cardCountLabel').textContent = `${String(currentIndex + 1).padStart(2, '0')} / ${String(activeList.length).padStart(2, '0')}`;
+    document.getElementById('deckProgressText').textContent = `INDEX: ${String(currentIndex + 1).padStart(2, '0')} / ${String(activeList.length).padStart(2, '0')}`;
+
+    if (currentMode === "mcq") {
+      const opts = [...item.options].sort(() => Math.random() - 0.5);
+      const optsHtml = opts.map((opt, i) => `
+        <button class="opt-btn" onclick="submitMcq('${opt.replace(/'/g, "\\'")}', this)">
+          <span style="color: var(--border-cyan); margin-right: 12px; font-weight:700;">[0${i+1}]</span> ${opt}
+        </button>
+      `).join('');
+
+      container.innerHTML = `
+        <h3 class="question-title">${item.question}</h3>
+        <div class="options-grid">${optsHtml}</div>
+      `;
+      footer.innerHTML = `
+        <div class="action-group-left">
+          <button class="btn btn-secondary" onclick="prevCard()" ${currentIndex === 0 ? 'disabled' : ''}>[PREV]</button>
+          <!-- Dedicated Redo Section Button -->
+          <button class="btn btn-redo" onclick="redoCurrentCard()" title="Reset current card to re-attempt">⟲ REDO PROTOCOL</button>
+        </div>
+        <div class="action-group-right">
+          <button class="btn btn-primary" id="nextBtn" onclick="nextCard()" disabled>NEXT NODE &gt;&gt;</button>
+        </div>
+      `;
+    } 
+    else if (currentMode === "identification") {
+      container.innerHTML = `
+        <h3 class="question-title">${item.question}</h3>
+        <div class="id-form">
+          <input type="text" id="idInput" class="terminal-input" placeholder="INPUT EXACT TELEMETRY IDENTIFIER..." autocomplete="off" />
+        </div>
+      `;
+      footer.innerHTML = `
+        <div class="action-group-left">
+          <button class="btn btn-secondary" onclick="prevCard()" ${currentIndex === 0 ? 'disabled' : ''}>[PREV]</button>
+          <!-- Dedicated Redo Section Button -->
+          <button class="btn btn-redo" onclick="redoCurrentCard()" title="Reset current card to re-attempt">⟲ REDO PROTOCOL</button>
+        </div>
+        <div class="action-group-right">
+          <button class="btn btn-primary" id="idActionBtn" onclick="handleIdAction()">EXECUTE CHECK (ENTER)</button>
+        </div>
+      `;
+
+      setTimeout(() => {
+        const input = document.getElementById('idInput');
+        if (input) {
+          input.focus();
+          input.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') handleIdAction();
+          });
+        }
+      }, 50);
+    } 
+    else if (currentMode === "flashcard") {
+      container.innerHTML = `
+        <div class="flip-container" onclick="this.querySelector('.flip-inner').classList.toggle('flipped')">
+          <div class="flip-inner">
+            <div class="flip-front">
+              <span class="terminal-tag" style="margin-bottom: 12px;">${item.title}</span>
+              <h3 style="font-size: 1.15rem; line-height: 1.5; color:#fff;">${item.question}</h3>
+              <p class="flip-hint">// CLICK TO DECRYPT CONCEPT //</p>
+            </div>
+            <div class="flip-back">
+              <span class="terminal-tag" style="margin-bottom: 10px; border-color: var(--neon-lime); color: var(--neon-lime);">DECRYPTED PROTOCOL</span>
+              <p style="font-size: 1.3rem; font-weight:700; color: #fff; margin-bottom: 8px;">${item.answer}</p>
+              <p style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.45; margin-bottom: 10px;">${item.explanation}</p>
+              <div style="font-size: 0.78rem; color: var(--neon-amber); text-align: left; padding: 6px 10px; background: rgba(0,0,0,0.6); border-radius: 4px; border-left: 2px solid var(--neon-amber);">
+                <strong>WHY THIS IS TRUE:</strong> ${item.whyTrue}
+              </div>
+              <p class="flip-hint">// CLICK TO RETURN //</p>
+            </div>
+          </div>
+        </div>
+      `;
+      footer.innerHTML = `
+        <div class="action-group-left">
+          <button class="btn btn-secondary" onclick="prevCard()" ${currentIndex === 0 ? 'disabled' : ''}>[PREV]</button>
+          <!-- Dedicated Redo Section Button -->
+          <button class="btn btn-redo" onclick="redoCurrentCard()" title="Flip back and reset">⟲ FLIP / RESET</button>
+        </div>
+        <div class="action-group-right">
+          <button class="btn btn-secondary" style="border-color: var(--neon-magenta); color: #fda4af;" onclick="rateFlashcard(false)">LOG FOR RETRY</button>
+          <button class="btn btn-primary" style="background: var(--neon-lime); color: #040711;" onclick="rateFlashcard(true)">CONFIRMED</button>
+        </div>
+      `;
+    }
+  }
+
+  // Dedicated Redo Logic
+  function redoCurrentCard() {
+    playResetTone();
+    loadCard();
+  }
+
+  // Handle Multiple Choice
+  function submitMcq(choice, btnEl) {
+    if (hasEvaluatedCurrent) return;
+    hasEvaluatedCurrent = true;
+    totalAttempts++;
+
+    const item = activeList[currentIndex];
+    const isCorrect = (choice === item.answer);
+    const allBtns = document.querySelectorAll('.opt-btn');
+    allBtns.forEach(b => {
+      b.disabled = true;
+      if (b.innerText.includes(item.answer)) b.classList.add('correct');
+    });
+
+    const feedback = document.getElementById('feedbackBox');
+    if (isCorrect) {
+      btnEl.classList.add('correct');
+      handleSuccess();
+      feedback.className = "feedback show correct";
+      feedback.innerHTML = `
+        <strong>// PROTOCOL VERIFIED //</strong> Correct answer: <strong>${item.answer}</strong>.
+        <div class="rationale-box">
+          <strong>WHY THIS ANSWER IS TRUE:</strong>
+          ${item.whyTrue}
+          <div style="margin-top: 6px; font-size: 0.78rem; color: #94a3b8;"><em>Context:</em> ${item.explanation}</div>
+        </div>
+      `;
+    } else {
+      btnEl.classList.add('wrong');
+      handleMistake(item, choice);
+      feedback.className = "feedback show wrong";
+      feedback.innerHTML = `
+        <strong>// SIGNAL DISCREPANCY //</strong> Valid protocol is: <strong>${item.answer}</strong>.
+        <div class="rationale-box">
+          <strong>WHY THIS ANSWER IS TRUE:</strong>
+          ${item.whyTrue}
+          <div style="margin-top: 6px; font-size: 0.78rem; color: #94a3b8;"><em>Context:</em> ${item.explanation}</div>
+        </div>
+      `;
+    }
+    const nextBtn = document.getElementById('nextBtn');
+    nextBtn.disabled = false;
+    nextBtn.focus();
+  }
+
+  // Handle Identification
+  function handleIdAction() {
+    const btn = document.getElementById('idActionBtn');
+    const input = document.getElementById('idInput');
+
+    if (hasEvaluatedCurrent) {
+      nextCard();
+      return;
+    }
+
+    const val = input.value.trim().toLowerCase();
+    if (!val) {
+      input.focus();
+      return;
+    }
+
+    hasEvaluatedCurrent = true;
+    input.disabled = true;
+    totalAttempts++;
+
+    const item = activeList[currentIndex];
+    const isCorrect = item.aliases.some(alias => alias.toLowerCase() === val);
+    const feedback = document.getElementById('feedbackBox');
+
+    if (isCorrect) {
+      input.classList.add('correct');
+      handleSuccess();
+      feedback.className = "feedback show correct";
+      feedback.innerHTML = `
+        <strong>// EXACT TELEMETRY MATCH //</strong> Protocol accepted: <strong>${item.answer}</strong>.
+        <div class="rationale-box">
+          <strong>WHY THIS ANSWER IS TRUE:</strong>
+          ${item.whyTrue}
+          <div style="margin-top: 6px; font-size: 0.78rem; color: #94a3b8;"><em>Context:</em> ${item.explanation}</div>
+        </div>
+      `;
+    } else {
+      input.classList.add('wrong');
+      handleMistake(item, input.value.trim());
+      feedback.className = "feedback show wrong";
+      feedback.innerHTML = `
+        <strong>// UNMATCHED TELEMETRY //</strong> Verified identifier is: <strong>${item.answer}</strong>.
+        <div class="rationale-box">
+          <strong>WHY THIS ANSWER IS TRUE:</strong>
+          ${item.whyTrue}
+          <div style="margin-top: 6px; font-size: 0.78rem; color: #94a3b8;"><em>Context:</em> ${item.explanation}</div>
+        </div>
+      `;
+    }
+
+    btn.textContent = "NEXT NODE >>";
+    btn.focus();
+  }
+
+  // Flashcards Rating
+  function rateFlashcard(knewIt) {
+    totalAttempts++;
+    const item = activeList[currentIndex];
+    if (knewIt) {
+      handleSuccess();
+    } else {
+      handleMistake(item, "Logged via Flashcard");
+    }
+    nextCard();
+  }
+
+  function handleSuccess() {
+    score += 10;
+    streak++;
+    xp += 25;
+    playSuccessPulse();
+    updateTrackers();
+  }
+
+  function handleMistake(item, userResponse) {
+    streak = 0;
+    playGlitchError();
+    updateTrackers();
+    if (!userMistakes.some(m => m.id === item.id)) {
+      userMistakes.push({ ...item, wrongInput: userResponse });
+      updateVaultBadge();
+    }
+  }
+
+  function updateTrackers() {
+    document.getElementById('scoreVal').textContent = score;
+    document.getElementById('streakVal').textContent = `${streak} 🔥`;
+
+    const accuracy = totalAttempts > 0 ? Math.round((score / (totalAttempts * 10)) * 100) : 0;
+    document.getElementById('accuracyVal').textContent = `${accuracy}%`;
+
+    const level = Math.floor(xp / 100) + 1;
+    const progressInLevel = xp % 100;
+    document.getElementById('levelVal').textContent = `Tier ${level}`;
+    document.getElementById('xpText').textContent = `${progressInLevel} / 100 CALIBER`;
+    document.getElementById('progressFill').style.width = `${progressInLevel}%`;
+  }
+
+  function updateVaultBadge() {
+    document.getElementById('vaultBadge').textContent = userMistakes.length;
+  }
+
+  function renderVault() {
+    const list = document.getElementById('vaultList');
+    if (userMistakes.length === 0) {
+      list.innerHTML = `<p style="text-align: center; color: var(--text-dim); padding: 40px 0;">No anomaly logs recorded. Complete operational synchronization achieved.</p>`;
+      return;
+    }
+
+    list.innerHTML = userMistakes.map(item => `
+      <div class="vault-card">
+        <div style="display:flex; justify-content:space-between;">
+          <span class="terminal-tag" style="border-color: var(--neon-magenta); color: var(--neon-magenta);">${item.topicName}</span>
+          <span style="font-size: 0.72rem; color: var(--text-dim);">${item.title}</span>
+        </div>
+        <h4>${item.question}</h4>
+        <p>Your Input: <span style="color: var(--neon-magenta); font-weight:700;">${item.wrongInput}</span> | Target: <span style="color: var(--neon-lime); font-weight:700;">${item.answer}</span></p>
+        <div class="rationale-box">
+          <strong>WHY THIS ANSWER IS TRUE:</strong>
+          ${item.whyTrue}
+          <div style="margin-top: 4px; font-size: 0.78rem; color: #94a3b8;"><em>Context:</em> ${item.explanation}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function drillVaultItems() {
+    if (userMistakes.length === 0) return;
+    activeList = [...userMistakes].sort(() => Math.random() - 0.5);
+    currentIndex = 0;
+    currentMode = "mcq";
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector('.tab-btn').classList.add('active');
+    document.getElementById('deckView').classList.remove('hidden');
+    document.getElementById('vaultView').classList.add('hidden');
+    loadCard();
+  }
+
+  function clearVault() {
+    userMistakes = [];
+    updateVaultBadge();
+    renderVault();
+  }
+
+  function nextCard() {
+    if (currentIndex < activeList.length - 1) {
+      currentIndex++;
+      loadCard();
+    } else {
+      alert("// RUN COMPLETE // End of data stream. Access Review Topics to drill anomalies.");
+    }
+  }
+
+  function prevCard() {
+    if (currentIndex > 0) {
+      currentIndex--;
+      loadCard();
+    }
+  }
+
+  initApp();
+</script>
+</body>
+</html>
